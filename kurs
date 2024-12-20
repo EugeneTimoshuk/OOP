@@ -1,0 +1,470 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include <strings.h>
+
+#define TEXT_SIZE 10
+
+char* readText() {
+    int size = TEXT_SIZE;
+    char *text = malloc(size * sizeof(char));
+    if (text == NULL) {
+        printf("Ошибка: невозможно выделить память!\n");
+        return NULL;
+    }
+
+    int n = 0;
+    char temp;
+    int newline_count = 0;
+
+    while (1) {
+        if (n >= size - 2) {
+            char *t = realloc(text, size + TEXT_SIZE);
+            if (!t) {
+                printf("Ошибка: невозможно перевыделить память!\n");
+                free(text);
+                return NULL;
+            }
+            size += TEXT_SIZE;
+            text = t;
+        }
+
+        temp = getchar();
+        text[n] = temp;
+        n++;
+
+        if (temp == '\n') {
+            newline_count++;
+            if (newline_count == 2) {
+                text[n - 2] = '\0';
+                break;
+            }
+        } else {
+            newline_count = 0;
+        }
+    }
+
+    return text;
+}
+
+char** splitIntoSentences(char* text, int* count) {
+    int capacity = 10;
+    char** sentences = malloc(capacity * sizeof(char*));
+    if (!sentences) {
+        printf("Ошибка: невозможно выделить память для предложений\n");
+        return NULL;
+    }
+
+    char* sentence = strtok(text, ".");
+    while (sentence) {
+        while (*sentence == ' ' || *sentence == '\t' || *sentence == '\n') {
+            sentence++; 
+        }
+
+        if (*sentence) { 
+            if (*count >= capacity) { 
+                capacity *= 2;
+                char** temp = realloc(sentences, capacity * sizeof(char*));
+                if (!temp) {
+                    printf("Ошибка: невозможно перевыделить память для предложений\n");
+                    free(sentences);
+                    return NULL;
+                }
+                sentences = temp;
+            }
+
+            sentences[*count] = malloc(strlen(sentence) + 1); 
+            if (!sentences[*count]) {
+                printf("Ошибка: невозможно выделить память для предложения\n");
+                free(sentences);
+                return NULL;
+            }
+            strcpy(sentences[*count], sentence); 
+            (*count)++;
+        }
+
+        sentence = strtok(NULL, ".");
+    }
+
+    return sentences;
+}
+
+char** remove_duplicate_sentences(char** sentences, int* len) {
+    char** del_sentences = (char**)calloc(*len, sizeof(char*));
+    int index = 0;
+    del_sentences[index++] = sentences[0];
+    for (int i = 1; i < *len; ++i) {
+        int is_duplicate = 0;
+        for (int j = 0; j < index; ++j) {
+            if (strcasecmp(sentences[i], del_sentences[j]) == 0) {
+                is_duplicate = 1;
+                break;
+            }
+        }
+        if (!is_duplicate) {
+            del_sentences[index++] = sentences[i];
+        }
+    }
+    *len = index;
+    return del_sentences;
+}
+
+int product_of_digits(char* sentence) {
+    int product = 1;
+    while (*sentence) {
+        if (isdigit((unsigned char)*sentence)) {
+            product *= *sentence - '0';
+        }
+        ++sentence;
+    }
+    return product;
+}
+
+void print_sentences(char** sentences, int count) {
+    for (int i = 0; i < count; i++) {
+        printf("%s.\n", sentences[i]);
+    }
+}
+
+void free_sentences(char** sentences, int count) {
+    for (int i = 0; i < count; i++) {
+        free(sentences[i]);
+    }
+    free(sentences);
+}
+
+void print_help() {
+    printf("0 - Вывод текста после первичной обязательной обработки\n");
+    printf("1 - Во всем тексте удалить слово, введенное пользователем. Если после удаления в предложении не останется слов, его необходимо удалить. Слова сравнивать без учёта регистра.\n");
+    printf("2 - Для каждого предложения вывести все заглавные буквы в лексикографическом порядке. Если в предложении нет заглавных букв, то ничего не выводить для данного предложения.\n");
+    printf("3 - Отсортировать предложения по среднему арифметическому чисел в предложении. Число - слово, состоящее только из цифр.\n");
+    printf("4 - Удалить все предложения, в которых нет строчных букв.\n");
+    printf("5 - Вывод справки о функциях, которые реализует программа.\n");
+}
+
+void handle_case0() {
+    static char *text = NULL;
+    static char **sentences = NULL;
+    static int sentenceCount = 0;
+
+    if (!text) {
+        text = readText();
+        if (text == NULL) {
+            printf("Ошибка: текст не был введён или произошла ошибка памяти.\n");
+            return;
+        }
+
+        sentences = splitIntoSentences(text, &sentenceCount);
+        free(text);
+
+        if (!sentences || sentenceCount == 0) {
+            printf("Ошибка: текст не содержит предложений\n");
+            return;
+        }
+    }
+
+    sentences = remove_duplicate_sentences(sentences, &sentenceCount);
+
+    print_sentences(sentences, sentenceCount);
+}
+
+void handle_case1() {
+    static char *text = NULL;
+    static char **sentences = NULL;
+    static int sentenceCount = 0;
+
+    if (!text) {
+        text = readText();
+        if (text == NULL) {
+            printf("Ошибка: текст не был введён или произошла ошибка памяти.\n");
+            return;
+        }
+
+        sentences = splitIntoSentences(text, &sentenceCount);
+        free(text);
+
+        if (!sentences || sentenceCount == 0) {
+            printf("Ошибка: текст не содержит предложений\n");
+            return;
+        }
+    }
+
+    char word_to_remove[256];
+    printf("Введите слово для удаления: ");
+    scanf("%s", word_to_remove);
+
+    for (int i = 0; i < sentenceCount; i++) {
+        char* sentence = sentences[i];
+        char* new_sentence = malloc(strlen(sentence) + 1);
+        if (!new_sentence) {
+            printf("Ошибка: невозможно выделить память для нового предложения\n");
+            return;
+        }
+        int index = 0;
+
+        for (char* token = strtok(sentence, " .,\t\n"); token != NULL; token = strtok(NULL, " .,\t\n")) {
+            if (strcasecmp(token, word_to_remove) != 0) {
+                if (index > 0) {
+                    new_sentence[index++] = ' ';
+                }
+                strcpy(&new_sentence[index], token);
+                index += strlen(token);
+            }
+        }
+
+        new_sentence[index] = '\0';
+        if (strlen(new_sentence) == 0) {
+            free(sentences[i]);
+            sentences[i] = NULL;
+        } else {
+            free(sentences[i]);
+            sentences[i] = malloc(strlen(new_sentence) + 1);
+            if (!sentences[i]) {
+                printf("Ошибка: невозможно выделить память для нового предложения\n");
+                return;
+            }
+            strcpy(sentences[i], new_sentence);
+        }
+        free(new_sentence);
+    }
+
+    int validCount = 0;
+    for (int i = 0; i < sentenceCount; i++) {
+        if (sentences[i] != NULL) {
+            validCount++;
+        }
+    }
+
+    char** validSentences = malloc(validCount * sizeof(char*));
+    if (!validSentences) {
+        printf("Ошибка: невозможно выделить память для предложений\n");
+        return;
+    }
+
+    int j = 0;
+    for (int i = 0; i < sentenceCount; i++) {
+        if (sentences[i] != NULL) {
+            validSentences[j++] = sentences[i];
+        } else {
+            free(sentences[i]);
+        }
+    }
+
+    free(sentences);
+    sentences = validSentences;
+    sentenceCount = validCount;
+
+    printf("\nТекст после удаления слова \"%s\":\n", word_to_remove);
+    print_sentences(sentences, sentenceCount);
+}
+
+void handle_case2() {
+    static char *text = NULL;
+    static char **sentences = NULL;
+    static int sentenceCount = 0;
+
+    if (!text) {
+        text = readText();
+        if (text == NULL) {
+            printf("Ошибка: текст не был введён или произошла ошибка памяти.\n");
+            return;
+        }
+
+        sentences = splitIntoSentences(text, &sentenceCount);
+        free(text);
+
+        if (!sentences || sentenceCount == 0) {
+            printf("Ошибка: текст не содержит предложений\n");
+            return;
+        }
+    }
+
+    for (int i = 0; i < sentenceCount; i++) {
+        char* sentence = sentences[i];
+        char uppercase_letters[256];
+        int count = 0;
+
+        for (char* ch = sentence; *ch != '\0'; ch++) {
+            if (isupper((unsigned char)*ch)) {
+                uppercase_letters[count++] = *ch;
+            }
+        }
+
+        if (count > 0) {
+            qsort(uppercase_letters, count, sizeof(char), (int (*)(const void*, const void*))strcmp);
+            printf("Заглавные буквы в предложении %d: ", i + 1);
+            for (int j = 0; j < count; j++) {
+                printf("%c", uppercase_letters[j]);
+            }
+            printf("\n");
+        }
+    }
+}
+
+void handle_case3() {
+    static char *text = NULL;
+    static char **sentences = NULL;
+    static int sentenceCount = 0;
+
+    if (!text) {
+        text = readText();
+        if (text == NULL) {
+            printf("Ошибка: текст не был введён или произошла ошибка памяти.\n");
+            return;
+        }
+
+        sentences = splitIntoSentences(text, &sentenceCount);
+        free(text);
+
+        if (!sentences || sentenceCount == 0) {
+            printf("Ошибка: текст не содержит предложений\n");
+            return;
+        }
+    }
+
+    float* averages = malloc(sentenceCount * sizeof(float));
+    if (!averages) {
+        printf("Ошибка: невозможно выделить память для средних значений\n");
+        return;
+    }
+
+    for (int i = 0; i < sentenceCount; i++) {
+        char* sentence = sentences[i];
+        int sum = 0;
+        int count = 0;
+        char* token = strtok(sentence, " .,\t\n");
+
+        while (token) {
+            int isNumber = 1;
+            for (int j = 0; token[j] != '\0'; j++) {
+                if (!isdigit((unsigned char)token[j])) {
+                    isNumber = 0;
+                    break;
+                }
+            }
+
+            if (isNumber) {
+                sum += atoi(token);
+                count++;
+            }
+
+            token = strtok(NULL, " .,\t\n");
+        }
+
+        if (count > 0) {
+            averages[i] = (float)sum / count;
+        } else {
+            averages[i] = 0;
+        }
+    }
+
+    for (int i = 0; i < sentenceCount - 1; i++) {
+        for (int j = i + 1; j < sentenceCount; j++) {
+            if (averages[i] > averages[j]) {
+                float tempAvg = averages[i];
+                averages[i] = averages[j];
+                averages[j] = tempAvg;
+
+                char* tempSentence = sentences[i];
+                sentences[i] = sentences[j];
+                sentences[j] = tempSentence;
+            }
+        }
+    }
+
+    printf("\nТекст после сортировки по среднему арифметическому чисел в предложениях:\n");
+    print_sentences(sentences, sentenceCount);
+
+    free(averages);
+}
+
+void handle_case4() {
+    static char *text = NULL;
+    static char **sentences = NULL;
+    static int sentenceCount = 0;
+
+    if (!text) {
+        text = readText();
+        if (text == NULL) {
+            printf("Ошибка: текст не был введён или произошла ошибка памяти.\n");
+            return;
+        }
+
+        sentences = splitIntoSentences(text, &sentenceCount);
+        free(text);
+
+        if (!sentences || sentenceCount == 0) {
+            printf("Ошибка: текст не содержит предложений\n");
+            return;
+        }
+    }
+
+    char **validSentences = malloc(sentenceCount * sizeof(char*));
+    if (!validSentences) {
+        printf("Ошибка: невозможно выделить память для предложений\n");
+        return;
+    }
+
+    int validCount = 0;
+    for (int i = 0; i < sentenceCount; ++i) {
+        int hasLowercase = 0;
+
+        for (char *ch = sentences[i]; *ch != '\0'; ++ch) {
+            if (islower((unsigned char)*ch)) {
+                hasLowercase = 1;
+                break;
+            }
+        }
+
+        if (hasLowercase) {
+            validSentences[validCount++] = sentences[i];
+        } else {
+            free(sentences[i]);
+        }
+    }
+
+    free(sentences);
+    sentences = validSentences;
+    sentenceCount = validCount;
+
+    printf("\nТекст после удаления предложений без строчных букв:\n");
+    print_sentences(sentences, sentenceCount);
+}
+
+void handle_case5() {
+    print_help();
+}
+
+void menu() {
+    int number;
+    scanf("%d", &number);
+    switch (number) {
+        case 0:
+            handle_case0();
+            break;
+        case 1:
+            handle_case1();
+            break;
+        case 2:
+            handle_case2();
+            break;
+        case 3:
+            handle_case3();
+            break;
+        case 4:
+            handle_case4();
+            break;
+        case 5:
+            handle_case5();
+            break;
+        default:
+            printf("Неверный выбор! Попробуйте снова.\n");
+    }
+}
+
+int main() {
+    printf("Course work for option 4.22, created by Eugene Timoshuk.\n");
+    menu();
+    return 0;
+}
